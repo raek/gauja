@@ -6,14 +6,20 @@ import (
 )
 
 type Message struct {
-	Sender     string
+	Sender     Sender
 	Command    string
 	Parameters []string
 }
 
+type Sender struct {
+	Nick  string
+	Login string
+	Host  string
+}
+
 func MakeMessage(command string, parameters ...string) Message {
 	return Message{
-		Sender:     "",
+		Sender:     Sender{},
 		Command:    command,
 		Parameters: parameters,
 	}
@@ -23,9 +29,17 @@ func MakeMessage(command string, parameters ...string) Message {
 
 func (msg Message) String() string {
 	var buffer bytes.Buffer
-	if msg.Sender != "" {
+	if msg.Sender.Nick != "" {
 		buffer.WriteString(":")
-		buffer.WriteString(msg.Sender)
+		buffer.WriteString(msg.Sender.Nick)
+		if msg.Sender.Login != "" {
+			buffer.WriteString("!")
+			buffer.WriteString(msg.Sender.Login)
+		}
+		if msg.Sender.Host != "" {
+			buffer.WriteString("@")
+			buffer.WriteString(msg.Sender.Host)
+		}
 		buffer.WriteString(" ")
 	}
 	buffer.WriteString(msg.Command)
@@ -60,11 +74,22 @@ func ParseMessage(line string) Message {
 	}
 }
 
-func (p *parseState) parseSender() string {
+func (p *parseState) parseSender() Sender {
 	if p.tryParseColon() {
-		return p.parseWord()
+		sender := p.parseWord()
+		nickAndLogin, host := splitOffOptionalSuffix(sender, "@")
+		nick, login := splitOffOptionalSuffix(nickAndLogin, "!")
+		return Sender{nick, login, host}
+	}
+	return Sender{}
+}
+
+func splitOffOptionalSuffix(s, del string) (string, string) {
+	i := strings.Index(s, del)
+	if i == -1 {
+		return s, ""
 	} else {
-		return ""
+		return s[:i], s[i+1:]
 	}
 }
 
