@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/signal"
 	"sync"
 	"time"
 )
@@ -97,6 +98,14 @@ func handle(networkName string, netConn net.Conn) {
 	conn := MakeConn(networkName, netConn, fromServer, toServer)
 	conn.ControlLogger.Print("Connected to server")
 	gauja.NewBot(fromServer, toServer)
+	go func() {
+		interrupt := make(chan os.Signal)
+		defer signal.Stop(interrupt)
+		signal.Notify(interrupt, os.Interrupt)
+		<-interrupt
+		conn.ControlLogger.Print("Received interrupt")
+		conn.Terminate()
+	}()
 	wg.Add(3)
 	go func() {
 		defer wg.Done()
