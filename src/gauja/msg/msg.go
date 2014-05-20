@@ -1,7 +1,8 @@
-package gauja
+package msg
 
 import (
 	"bytes"
+	"gauja/lineio"
 	"strings"
 )
 
@@ -144,4 +145,36 @@ func (p *parseState) parseRest() string {
 	result := p.input[p.pos:]
 	p.pos = len(p.input)
 	return result
+}
+
+// Channels
+
+type MessageChans struct {
+	R <-chan Message
+	W chan<- Message
+}
+
+func MessageChansPair() (a, b MessageChans) {
+	aToB := make(chan Message)
+	bToA := make(chan Message)
+	a = MessageChans{R: bToA, W: aToB}
+	b = MessageChans{R: aToB, W: bToA}
+	return
+}
+
+func Manage(lines lineio.LineChans) (msgs MessageChans) {
+	msgs, myMsgs := MessageChansPair()
+	go func() {
+		defer close(myMsgs.W)
+		for line := range lines.R {
+			myMsgs.W <- ParseMessage(line)
+		}
+	}()
+	go func() {
+		defer close(lines.W)
+		for msg := range myMsgs.R {
+			lines.W <- msg.String()
+		}
+	}()
+	return
 }

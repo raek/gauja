@@ -12,10 +12,11 @@ import (
 	"time"
 )
 
-const (
-	readTimeout  = 10 * time.Minute
-	writeTimeout = 1 * time.Minute
-)
+var timeoutSettings = gauja.TimeoutSettings{
+	ConnectTimeout: 1 * time.Minute,
+	ReadTimeout:    10 * time.Minute,
+	WriteTimeout:   1 * time.Minute,
+}
 
 func main() {
 	err := do()
@@ -37,7 +38,7 @@ func do() error {
 }
 
 func connect(address string) (net.Conn, error) {
-	conn, err := net.DialTimeout("tcp", address, 3*time.Second)
+	conn, err := net.DialTimeout("tcp", address, timeoutSettings.ConnectTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -129,9 +130,9 @@ func (conn conn) handleFromServer() {
 	defer logger.Print("Done")
 	scanner := bufio.NewScanner(conn.NetConn)
 	scanner.Split(bufio.ScanLines)
-	conn.NetConn.SetReadDeadline(time.Now().Add(readTimeout))
+	conn.NetConn.SetReadDeadline(time.Now().Add(timeoutSettings.ReadTimeout))
 	for scanner.Scan() {
-		conn.NetConn.SetReadDeadline(time.Now().Add(readTimeout))
+		conn.NetConn.SetReadDeadline(time.Now().Add(timeoutSettings.ReadTimeout))
 		line := scanner.Text()
 		msg := gauja.ParseMessage(line)
 		logger.Print(msg)
@@ -143,7 +144,7 @@ func (conn conn) handleFromServer() {
 			return
 		}
 		if isTimeout(err) {
-			logger.Printf("Timeout (%v)", readTimeout)
+			logger.Printf("Timeout (%v)", timeoutSettings.ReadTimeout)
 		} else {
 			logger.Printf("Error when reading: %v", err)
 		}
@@ -169,7 +170,7 @@ func (conn conn) handleToServer() {
 				return
 			}
 			logger.Print(msg)
-			conn.NetConn.SetWriteDeadline(time.Now().Add(writeTimeout))
+			conn.NetConn.SetWriteDeadline(time.Now().Add(timeoutSettings.WriteTimeout))
 			_, err := w.WriteString(msg.String())
 			_, err = w.WriteString("\r\n")
 			err = w.Flush()
@@ -179,7 +180,7 @@ func (conn conn) handleToServer() {
 					return
 				}
 				if isTimeout(err) {
-					logger.Printf("Timeout (%v)", writeTimeout)
+					logger.Printf("Timeout (%v)", timeoutSettings.WriteTimeout)
 				} else {
 					logger.Printf("Error when writing: %v", err)
 				}
