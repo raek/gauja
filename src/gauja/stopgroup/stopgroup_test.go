@@ -1,14 +1,17 @@
 package stopgroup
 
-import "testing"
-import "time"
+import (
+	"testing"
+	"time"
+)
 
 func TestIsStoppedAfterStopCall(t *testing.T) {
 	sg := New(func() {
 		time.Sleep(3 * time.Second)
 	})
-	sg.Stop()
-	if !IsStopped(sg) {
+	sg.Stop(nil)
+	_, stopped := sg.SampleStopState()
+	if !stopped {
 		t.Fail()
 	}
 }
@@ -18,11 +21,12 @@ func TestIsStoppedBeforeFuncIsCalled(t *testing.T) {
 	wasStopped := make(chan bool)
 	sg := New(func() {
 		sg := <-sgChan
-		wasStopped <- IsStopped(sg)
+		_, stopped := sg.SampleStopState()
+		wasStopped <- stopped
 	})
 	sgChan <- sg
 	go func() {
-		sg.Stop()
+		sg.Stop(nil)
 	}()
 	if !<-wasStopped {
 		t.Fail()

@@ -37,21 +37,30 @@ func Manage(rwc io.ReadWriteCloser) (lines LineChans, sg stopgroup.StopGroup) {
 }
 
 func (lio lineIo) manageReads() {
-	defer lio.Stop()
+	defer lio.Stop(nil)
 	defer close(lio.W)
 	s := bufio.NewScanner(lio)
 	s.Split(bufio.ScanLines)
 	for s.Scan() {
 		lio.W <- s.Text()
 	}
+	_, stopped := lio.SampleStopState()
+	if !stopped {
+		err := s.Err()
+		if err != nil {
+			lio.Stop(err)
+		} else {
+			lio.Stop(io.EOF)
+		}
+	}
 }
 
 func (lio lineIo) manageWrites() {
-	defer lio.Stop()
+	defer lio.Stop(nil)
 	w := bufio.NewWriter(lio)
 	for {
 		select {
-		case <-lio.Stopped():
+		case <-lio.NotifyOnStop():
 			return
 		case line, ok := <-lio.R:
 			if !ok {

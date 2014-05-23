@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"gauja/heartbeat"
 	"gauja/lineio"
@@ -13,9 +14,13 @@ import (
 	"time"
 )
 
-var heartbeatPeriod = 10 * time.Second
-var connectTimeout = heartbeatPeriod
-var pongPeriod = heartbeatPeriod / 2
+var (
+	heartbeatPeriod = 10 * time.Minute
+	connectTimeout  = heartbeatPeriod
+	pongPeriod      = heartbeatPeriod / 2
+
+	ErrInterruptSignal = errors.New("gauja: interrupt signalled")
+)
 
 func main() {
 	interrupted := make(chan os.Signal)
@@ -44,12 +49,15 @@ func main() {
 		for _ = range msgs.R {
 		}
 	}()
-	select {
-	case <-interrupted:
-		fmt.Println("Interrupted")
-		sg.Stop()
-	case <-sg.Stopped():
+	go func() {
+		<-interrupted
+		sg.Stop(ErrInterruptSignal)
+	}()
+	err = <-sg.NotifyOnStop()
+	if err != nil {
+		fmt.Println(err)
+	} else {
+		fmt.Println("Shutting down gracefully.")
 	}
-	fmt.Println("Shutting down...")
 	time.Sleep(3 * time.Second)
 }

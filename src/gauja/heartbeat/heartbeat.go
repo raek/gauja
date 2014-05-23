@@ -1,6 +1,7 @@
 package heartbeat
 
 import (
+	"errors"
 	"gauja/msg"
 	"gauja/stopgroup"
 	"time"
@@ -11,16 +12,21 @@ type Durations struct {
 	WriteTimeout time.Duration
 }
 
+var (
+	ErrReadTimeout  = errors.New("heartbeat: read timeout")
+	ErrWriteTimeout = errors.New("heartbeat: write timeout")
+)
+
 func Manage(upstream msg.MessageChans, sg stopgroup.StopGroup, ds Durations) (downstream msg.MessageChans) {
 	downstream, myMsgs := msg.MessageChansPair()
 	go func() {
 		defer close(myMsgs.W)
 		for {
 			select {
-			case <-sg.Stopped():
+			case <-sg.NotifyOnStop():
 				return
 			case <-time.After(ds.ReadTimeout):
-				sg.Stop()
+				sg.Stop(ErrReadTimeout)
 				return
 			case msg, ok := <-upstream.R:
 				if !ok {
@@ -34,10 +40,10 @@ func Manage(upstream msg.MessageChans, sg stopgroup.StopGroup, ds Durations) (do
 		defer close(upstream.W)
 		for msg := range myMsgs.R {
 			select {
-			case <-sg.Stopped():
+			case <-sg.NotifyOnStop():
 				return
 			case <-time.After(ds.WriteTimeout):
-				sg.Stop()
+				sg.Stop(ErrWriteTimeout)
 				return
 			case upstream.W <- msg:
 			}

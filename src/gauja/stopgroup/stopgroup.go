@@ -5,40 +5,47 @@ import (
 )
 
 type StopGroup interface {
-	Stopped() <-chan struct{}
-	Stop()
+	NotifyOnStop() <-chan error
+	Stop(err error)
+	SampleStopState() (err error, stopped bool)
 }
 
 type stopGroup struct {
-	stopOnce   *sync.Once
-	stopped    chan struct{}
-	stopAction func()
+	once   *sync.Once
+	result chan error
+	action func()
 }
 
 func New(stopAction func()) StopGroup {
 	return stopGroup{
-		stopOnce:   new(sync.Once),
-		stopped:    make(chan struct{}),
-		stopAction: stopAction,
+		once:   new(sync.Once),
+		result: make(chan error, 1),
+		action: stopAction,
 	}
 }
 
-func (sg stopGroup) Stopped() <-chan struct{} {
-	return sg.stopped
+func (sg stopGroup) NotifyOnStop() <-chan error {
+	c := make(chan error)
+	go func() {
+		err := <-sg.result
+		sg.result <- err
+		c <- err
+	}()
+	return c
 }
 
-func (sg stopGroup) Stop() {
-	sg.stopOnce.Do(func() {
-		close(sg.stopped)
-		go sg.stopAction()
+func (sg stopGroup) Stop(err error) {
+	sg.once.Do(func() {
+		sg.result <- err
+		go sg.action()
 	})
 }
 
-func IsStopped(sg StopGroup) bool {
+func (sg stopGroup) SampleStopState() (err error, stopped bool) {
 	select {
-	case <-sg.Stopped():
-		return true
+	case err := <-sg.result:
+		return err, true
 	default:
-		return false
+		return nil, false
 	}
 }
