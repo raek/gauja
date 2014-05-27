@@ -68,9 +68,10 @@ func (lio lineIo) manageReads() {
 func (lio lineIo) manageWrites() {
 	defer lio.Stop(nil)
 	w := bufio.NewWriter(lio)
+	onStop := lio.NotifyOnStop()
 	for {
 		select {
-		case <-lio.NotifyOnStop():
+		case <-onStop:
 			return
 		case line, ok := <-lio.R:
 			if !ok {
