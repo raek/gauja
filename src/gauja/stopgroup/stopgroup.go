@@ -7,7 +7,6 @@ import (
 type StopGroup interface {
 	NotifyOnStop() <-chan error
 	Stop(err error)
-	SampleStopState() (err error, stopped bool)
 }
 
 type stopGroup struct {
@@ -39,13 +38,4 @@ func (sg stopGroup) Stop(err error) {
 		sg.result <- err
 		go sg.action()
 	})
-}
-
-func (sg stopGroup) SampleStopState() (err error, stopped bool) {
-	select {
-	case err := <-sg.result:
-		return err, true
-	default:
-		return nil, false
-	}
 }

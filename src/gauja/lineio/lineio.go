@@ -44,14 +44,11 @@ func (lio lineIo) manageReads() {
 	for s.Scan() {
 		lio.W <- s.Text()
 	}
-	_, stopped := lio.SampleStopState()
-	if !stopped {
-		err := s.Err()
-		if err != nil {
-			lio.Stop(err)
-		} else {
-			lio.Stop(io.EOF)
-		}
+	err := s.Err()
+	if err != nil {
+		lio.Stop(err)
+	} else {
+		lio.Stop(io.EOF)
 	}
 }
 

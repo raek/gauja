@@ -5,13 +5,16 @@ import (
 	"time"
 )
 
+var timeout = 10 * time.Second
+
 func TestIsStoppedAfterStopCall(t *testing.T) {
 	sg := New(func() {
 		time.Sleep(3 * time.Second)
 	})
 	sg.Stop(nil)
-	_, stopped := sg.SampleStopState()
-	if !stopped {
+	select {
+	case <-sg.NotifyOnStop():
+	case <-time.After(timeout):
 		t.Fail()
 	}
 }
@@ -21,8 +24,12 @@ func TestIsStoppedBeforeFuncIsCalled(t *testing.T) {
 	wasStopped := make(chan bool)
 	sg := New(func() {
 		sg := <-sgChan
-		_, stopped := sg.SampleStopState()
-		wasStopped <- stopped
+		select {
+		case <-sg.NotifyOnStop():
+			wasStopped <- true
+		default:
+			wasStopped <- false
+		}
 	})
 	sgChan <- sg
 	go func() {
