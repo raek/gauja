@@ -31,9 +31,22 @@ func Manage(rwc io.ReadWriteCloser) (lines LineChans, sg stopgroup.StopGroup) {
 	})
 	lines, myLines := LineChansPair()
 	lio := lineIo{rwc, sg, myLines}
-	go lio.manageReads()
-	go lio.manageWrites()
+	go doAndStop(lio, lio.manageReads)
+	go doAndStop(lio, lio.manageWrites)
 	return
+}
+
+func doAndStop(sg stopgroup.StopGroup, f func()) {
+	defer func() {
+		v := recover()
+		err, ok := v.(error)
+		if ok {
+			sg.Stop(err)
+		} else {
+			sg.Stop(nil)
+		}
+	}()
+	f()
 }
 
 func (lio lineIo) manageReads() {
