@@ -21,9 +21,10 @@ func Manage(upstream msg.MessageChans, sg stopgroup.StopGroup, ds Durations) (do
 	downstream, myMsgs := msg.MessageChansPair()
 	go func() {
 		defer close(myMsgs.W)
+		onStop := sg.NotifyOnStop()
 		for {
 			select {
-			case <-sg.NotifyOnStop():
+			case <-onStop:
 				return
 			case <-time.After(ds.ReadTimeout):
 				sg.Stop(ErrReadTimeout)
@@ -38,9 +39,10 @@ func Manage(upstream msg.MessageChans, sg stopgroup.StopGroup, ds Durations) (do
 	}()
 	go func() {
 		defer close(upstream.W)
+		onStop := sg.NotifyOnStop()
 		for msg := range myMsgs.R {
 			select {
-			case <-sg.NotifyOnStop():
+			case <-onStop:
 				return
 			case <-time.After(ds.WriteTimeout):
 				sg.Stop(ErrWriteTimeout)
